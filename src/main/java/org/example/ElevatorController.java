@@ -1,6 +1,10 @@
 package org.example;
 
+import java.util.TreeSet;
+
 public class ElevatorController extends Elevator {
+
+    private final TreeSet<Integer> oppDirFloorRequestList = new TreeSet<>();
 
     @Override
     public void pressFloorButton (int floor)
@@ -15,7 +19,15 @@ public class ElevatorController extends Elevator {
             System.out.println();
             return;
         }
-        floorRequestList.add(floor);
+
+        if((goingUp && floor > currentFloor) || (!goingUp && floor < currentFloor)) {
+            floorRequestList.add(floor);
+
+        }
+        else {
+            oppDirFloorRequestList.add(floor);
+        }
+        
     }
 
 
@@ -31,6 +43,8 @@ public class ElevatorController extends Elevator {
         Integer nextFloor = goingUp ? floorRequestList.ceiling(currentFloor) : floorRequestList.floor(currentFloor);
         if(nextFloor == null) {
             goingUp = !goingUp;
+            floorRequestList.addAll(oppDirFloorRequestList);
+            oppDirFloorRequestList.clear();
             nextFloor = goingUp ? floorRequestList.ceiling(currentFloor) : floorRequestList.floor(currentFloor);
         }
         if(nextFloor == null) {
