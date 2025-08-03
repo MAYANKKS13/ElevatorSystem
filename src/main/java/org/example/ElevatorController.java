@@ -1,42 +1,49 @@
 package org.example;
 
-import java.util.TreeSet;
+import java.util.*;
+import java.util.concurrent.ConcurrentSkipListSet;
 
 public class ElevatorController extends Elevator {
 
-    private final TreeSet<Integer> oppDirFloorRequestList = new TreeSet<>();
+    protected ConcurrentSkipListSet<Integer> floorRequestList = new ConcurrentSkipListSet<>();
+    private final ConcurrentSkipListSet<Integer> oppDirFloorRequestList = new ConcurrentSkipListSet<>();
+    private final Map<Integer, List<Requestor>> waitingMap = new HashMap<>();
+
+    public ElevatorController() {
+        for (int i = 0; i <= 5; i++) {
+            waitingMap.put(i, new ArrayList<>());
+        }
+    }
 
     @Override
-    public void pressFloorButton (int floor)
+    public synchronized void pressFloorButton (Requestor requestor)
     {
-        if(floor < 0 || floor > 5) {
-            System.out.println("Invalid floor request. Enter floor number b/w 0 and 5.");
-            System.out.println();
-            return;
-        }
-        if(floor == currentFloor) {
-            System.out.println("You are already on the current floor.");
-            System.out.println();
-            return;
-        }
+        int sourceFloor = requestor.getSourceFloor();
+        waitingMap.get(sourceFloor).add(requestor);
 
-        if((goingUp && floor > currentFloor) || (!goingUp && floor < currentFloor)) {
-            floorRequestList.add(floor);
-
+        if(sourceFloor == currentFloor) {
+            floorRequestList.add(requestor.getDestinationFloor());
+            System.out.printf("------{PICKUP} Passenger already at floor %d → Going to floor %d%n",
+                    sourceFloor, requestor.getDestinationFloor());
         }
         else {
-            oppDirFloorRequestList.add(floor);
+            if((goingUp && sourceFloor > currentFloor) || (!goingUp && sourceFloor < currentFloor)) {
+                floorRequestList.add(sourceFloor);
+            }
+            else {
+                oppDirFloorRequestList.add(sourceFloor);
+            }
+            System.out.printf("------{REQUEST} Pickup requested at floor %d → Destination: %d%n",
+                    sourceFloor, requestor.getDestinationFloor());
         }
         
     }
 
 
     @Override
-    public void moveToFloor()
+    public synchronized void moveToFloor()
     {
         if (floorRequestList.isEmpty()) {
-            System.out.println("------- No floor requests pending -------");
-            System.out.println();
             return;
         }
 
@@ -48,8 +55,6 @@ public class ElevatorController extends Elevator {
             nextFloor = goingUp ? floorRequestList.ceiling(currentFloor) : floorRequestList.floor(currentFloor);
         }
         if(nextFloor == null) {
-            System.out.println("------- No more pending floor requests -------");
-            System.out.println();
             return;
         }
 
@@ -61,22 +66,43 @@ public class ElevatorController extends Elevator {
         }
 
         if(floorRequestList.contains(currentFloor)) {
-            System.out.println("------- REACHED YOUR REQUESTED FLOOR " + currentFloor + " -------");
+            System.out.printf("------{STOP} Elevator stopped at floor %d%n", currentFloor);
             System.out.println();
             floorRequestList.remove(currentFloor);
+
+            List<Requestor>  waitingRequestorslist = waitingMap.get(currentFloor);
+            if (waitingRequestorslist != null && !waitingRequestorslist.isEmpty()) {
+                for (Requestor waitingRequestor : waitingRequestorslist) {
+                    System.out.printf("------{BOARD} Passenger boards at floor %d → Destination: %d%n",
+                            currentFloor, waitingRequestor.getDestinationFloor());
+                    floorRequestList.add(waitingRequestor.getDestinationFloor());
+                }
+                waitingRequestorslist.clear();
+            }
+            System.out.printf("------{EXIT} Passenger(s) getting off at floor %d%n", currentFloor);
         }
         else {
-            System.out.println("------- CROSSING FLOOR " + currentFloor + " -------");
+            System.out.printf("------{PASS} Elevator crossing floor %d%n", currentFloor);
             System.out.println();
         }
     }
 
-
+    @Override
     public void startElevator() throws InterruptedException
     {
-        while (!floorRequestList.isEmpty()) {
-            moveToFloor();
-            Thread.sleep(2000);
+        while (true) {
+            synchronized (this) {
+                if (floorRequestList.isEmpty() && !oppDirFloorRequestList.isEmpty()) {
+                    goingUp = !goingUp;
+                    floorRequestList.addAll(oppDirFloorRequestList);
+                    oppDirFloorRequestList.clear();
+                }
+            }
+
+            while (!floorRequestList.isEmpty()) {
+                moveToFloor();
+                Thread.sleep(2000);
+            }
         }
     }
 }
