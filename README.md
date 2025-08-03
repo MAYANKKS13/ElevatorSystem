@@ -5,15 +5,15 @@
 ### 🛠️ Features
 
 - Handles multiple floor requests.
-- Moves step-by-step b/w floors.
+- Simulation
 - Supports direction changes when needed.
+- Load Handling
 
 ### 🛠️ Work in Progress
 
 Future improvements (as of now) will include:
 
-- Adding simulation
-- Load handling
+- Keeping track of requestors
 
 ### 🔧 Technologies Used
 
